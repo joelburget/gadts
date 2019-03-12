@@ -6,7 +6,7 @@
 {-# language TypeOperators     #-}
 module GADTs where
 
-import Data.Functor.Classes (liftEq)
+-- import Data.Functor.Classes (liftEq)
 
 
 
@@ -77,18 +77,7 @@ eval0 :: Term0 -> Maybe Val
 eval0 = \case
   Zero0 -> Just $ IV 0
 
-  Succ0 tm -> eval0 tm >>= \case
-    IV i -> Just $ IV $ succ i
-    BV _ -> Nothing
-  Pred0 tm -> eval0 tm >>= \case
-    IV i -> Just $ IV $ pred i
-    BV _ -> Nothing
-  IsZero0 tm -> eval0 tm >>= \case
-    IV i -> Just $ BV $ i == 0
-    BV _ -> Nothing
-  If0 cond a b -> eval0 cond >>= \case
-    IV _     -> Nothing
-    BV condV -> if condV then eval0 a else eval0 b
+  _ -> error "TODO"
 
 
 
@@ -224,10 +213,7 @@ data Term t where
 eval :: Term t -> t
 eval = \case
   Zero        -> 0
-  Succ tm     -> succ $ eval tm
-  Pred tm     -> pred $ eval tm
-  IsZero tm   -> eval tm == 0
-  If cond a b -> if eval cond then eval a else eval b
+  _ -> error "TODO"
 
 
 
@@ -367,10 +353,7 @@ serializeChar :: Char -> [Bit]
 serializeChar = undefined
 
 eq :: Type t -> t -> t -> Bool
-eq RInt            a        b        = a == b
-eq RChar           a        b        = a == b
-eq (RList ty)      a        b        = liftEq (eq ty) a b
-eq (RPair tya tyb) (a1, b1) (a2, b2) = eq tya a1 a2 && eq tyb b1 b2
+eq = error "TODO"
 
 
 
@@ -430,25 +413,14 @@ eq (RPair tya tyb) (a1, b1) (a2, b2) = eq tya a1 a2 && eq tyb b1 b2
 data a :~: b where
   Refl :: a :~: a
 
+tEqual :: Type a -> Type b -> Maybe (a :~: b)
+tEqual _ _ = error "TODO"
+
 data Existential where
   Some :: Type t -> t -> Existential
 
-tEqual :: Type a -> Type b -> Maybe (a :~: b)
-tEqual RInt      RInt      = Just Refl
-tEqual RChar     RChar     = Just Refl
-tEqual (RList a) (RList b) = do
-  Refl <- tEqual a b
-  pure Refl
-tEqual (RPair a1 b1) (RPair a2 b2) = do
-  Refl <- tEqual a1 a2 
-  Refl <- tEqual b1 b2
-  pure Refl
-tEqual _ _ = Nothing
-
 instance Eq Existential where
-  Some ty1 t1 == Some ty2 t2 = case tEqual ty1 ty2 of
-    Nothing   -> False
-    Just Refl -> eq ty1 t1 t2
+  (==) = error "TODO"
 
 from :: a :~: b -> (a -> b)
 from Refl = id
