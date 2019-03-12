@@ -7,8 +7,6 @@
 module GADTs where
 
 import Data.Functor.Classes (liftEq)
-import Data.Type.Equality   ((:~:)(..))
-import Data.String          (IsString(fromString))
 
 
 
@@ -60,7 +58,7 @@ import Data.String          (IsString(fromString))
 
 
 
--- Chapter 1:
+-- Chapter 1 (0?):
 --
 -- Evaluating a simple language
 
@@ -78,6 +76,7 @@ data Val
 eval0 :: Term0 -> Maybe Val
 eval0 = \case
   Zero0 -> Just $ IV 0
+
   Succ0 tm -> eval0 tm >>= \case
     IV i -> Just $ IV $ succ i
     BV _ -> Nothing
@@ -141,6 +140,69 @@ eval0 = \case
 
 
 
+-- Chapter 1.5
+--
+-- GADT syntax
+
+data Maybe' a where
+  Just'    :: a -> Maybe' a
+  Nothing' ::      Maybe' a
+
+data Val' ty where
+  IV' :: Int  -> Val' Int
+  BV' :: Bool -> Val' Bool
+
+-- index vs parameter
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 -- Chapter 2:
 --
 -- As a GADT
@@ -154,20 +216,79 @@ data Term0' where
 
 data Term t where
   Zero   :: Term Int
-  Succ   :: Term Int -> Term Int
-  Pred   :: Term Int -> Term Int
-  IsZero :: Term Int -> Term Bool
+  Succ   :: Term Int  -> Term Int
+  Pred   :: Term Int  -> Term Int
+  IsZero :: Term Int  -> Term Bool
   If     :: Term Bool -> Term a -> Term a -> Term a
 
 eval :: Term t -> t
 eval = \case
   Zero        -> 0
-  Succ tm     -> succ (eval tm)
-  Pred tm     -> pred (eval tm)
+  Succ tm     -> succ $ eval tm
+  Pred tm     -> pred $ eval tm
   IsZero tm   -> eval tm == 0
   If cond a b -> if eval cond then eval a else eval b
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- Chapter 2.5
+--
+-- GADTs desugared
+
+data ExTerm t where
+  ExZero   :: t ~ Int  => ExTerm t
+  ExSucc   :: t ~ Int  => ExTerm Int  -> ExTerm t
+  ExPred   :: t ~ Int  => ExTerm Int  -> ExTerm t
+  ExIsZero :: t ~ Bool => ExTerm Int  -> ExTerm t
+  ExIf     ::             ExTerm Bool -> ExTerm t -> ExTerm t -> ExTerm t
 
 
 
@@ -232,18 +353,18 @@ rString = RList RChar
 
 type Bit = Bool
 
-compress :: Type t -> t -> [Bit]
-compress RInt          i        = compressInt i
-compress RChar         c        = compressChar c
-compress (RList _)     []       = False : []
-compress (RList ra)    (a : as) = True : compress ra a ++ compress (RList ra) as
-compress (RPair ra rb) (a, b)   = compress ra a ++ compress rb b
+serialize :: Type t -> t -> [Bit]
+serialize RInt          i        = serializeInt i
+serialize RChar         c        = serializeChar c
+serialize (RList _)     []       = False : []
+serialize (RList ra)    (a : as) = True : serialize ra a ++ serialize (RList ra) as
+serialize (RPair ra rb) (a, b)   = serialize ra a ++ serialize rb b
 
-compressInt :: Int -> [Bit]
-compressInt = undefined
+serializeInt :: Int -> [Bit]
+serializeInt = undefined
 
-compressChar :: Char -> [Bit]
-compressChar = undefined
+serializeChar :: Char -> [Bit]
+serializeChar = undefined
 
 eq :: Type t -> t -> t -> Bool
 eq RInt            a        b        = a == b
@@ -301,12 +422,13 @@ eq (RPair tya tyb) (a1, b1) (a2, b2) = eq tya a1 a2 && eq tyb b1 b2
 
 
 
--- Chapter N:
+-- Chapter 4:
 --
 -- Existentials
 
--- data a :~: b where
---   Refl :: a :~: b
+-- Data.Type.Equality ((:~:)(Refl))
+data a :~: b where
+  Refl :: a :~: a
 
 data Existential where
   Some :: Type t -> t -> Existential
@@ -334,21 +456,70 @@ from Refl = id
 to :: a :~: b -> (b -> a)
 to Refl = id
 
--- Chapter N
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- Chapter 5
+--
+-- Type-safe formatting
 
 data Dir x y where
-  Lit    :: String                -> Dir x x
-  Int    ::                          Dir x (Int -> x)
-  String ::                          Dir x (String -> x)
-  (:^:)  :: Dir y1 y2 -> Dir x y1 -> Dir x y2
-
-instance IsString (Dir x x) where
-  fromString = Lit
+  Lit    :: String             -> Dir x x
+  Int    ::                       Dir x (Int -> x)
+  String ::                       Dir x (String -> x)
+  (:^:)  :: Dir b c -> Dir a b -> Dir a c
 
 format' :: Dir x y -> (String -> x) -> (String -> y)
-format' (Lit s)     = \cont out -> cont (out ++ s)
-format' Int         = \cont out -> \i -> cont (out ++ show i)
-format' String      = \cont out -> \s -> cont (out ++ s)
+format' (Lit s)     = \cont out   -> cont (out ++ s)
+format' Int         = \cont out i -> cont (out ++ show i)
+format' String      = \cont out s -> cont (out ++ s)
 format' (d1 :^: d2) = format' d1 . format' d2
 
 format :: Dir String y -> y
@@ -356,7 +527,7 @@ format d = format' d id ""
 
 formatExamples :: [String]
 formatExamples  =
-  [ format "Richard"
+  [ format $ Lit "Richard"
   , format Int 60
   , format (String :^: Lit " is " :^: Int) "Richard" 60
   ]
@@ -411,7 +582,7 @@ formatExamples  =
 
 
 
--- Chapter N+1
+-- Chapter 6
 --
 -- via https://gist.github.com/rampion/2659812
 
@@ -429,3 +600,5 @@ data Node c n a where
   B     :: Node cL n a    -> a -> Node cR n a    -> Node Black (Succ n) a 
   -- internal red nodes can only have black children
   R     :: Node Black n a -> a -> Node Black n a -> Node Red n a
+
+-- Many examples from Ralf Hinze -- Fun with phantom types
